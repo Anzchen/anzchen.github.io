@@ -26,3 +26,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Merged AI-expanded painting sources (33MB) and the retired ink-plate art.
+# Build inputs for scripts/make-painting-layers.mjs, not needed to build the
+# site: the shipped layers in src/assets/painting/ are committed. Originals
+# live in ~/Documents/painting-cuts/.
+src/assets/painting-src/
+src/assets/plates-src/

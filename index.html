@@ -2,7 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/src/assets/images/icon.png" />
+    <!-- Icons live in public/ so Vite copies them verbatim. Anything under
+         src/assets gets content-hashed into /assets/, which is why the old
+         hardcoded /src/... URLs 404'd in production.
+         Regenerate with: node scripts/make-icons.mjs -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
     <!-- SEO Meta Tags -->
@@ -15,12 +21,17 @@
     <meta property="og:url" content="https://anthonyzchen.com/" />
     <meta property="og:title" content="Anthony Chen | Software Engineer & Finance" />
     <meta property="og:description" content="Software Engineer and Finance student at Northeastern University. Building accessible, aesthetic, and adaptable solutions." />
-    <meta property="og:image" content="https://anthonyzchen.com/src/assets/images/icon.png" />
+    <meta property="og:site_name" content="Anthony Chen" />
+    <meta property="og:image" content="https://anthonyzchen.com/og-image-1200x630.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Anthony Chen, Software Engineer &amp; App Developer" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Anthony Chen | Software Engineer & Finance" />
     <meta name="twitter:description" content="Software Engineer and Finance student at Northeastern University. Building accessible, aesthetic, and adaptable solutions." />
+    <meta name="twitter:image" content="https://anthonyzchen.com/og-image-1200x630.png" />
 
     <!-- Fonts: Fraunces (display) + KoHo (body) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />

@@ -149,7 +149,7 @@ const Footer = () => {
   ];
 
   return (
-    <footer ref={footerRef} className="relative flex h-screen w-full flex-col overflow-hidden bg-beige">
+    <footer ref={footerRef} className="relative flex h-screen w-full flex-col overflow-hidden">
       {/* Faded painting background overlay */}
       <div
         className="pointer-events-none absolute inset-0 bg-painting bg-cover bg-center opacity-[0.04]"

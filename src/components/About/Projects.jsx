@@ -313,7 +313,7 @@ const Projects = () => {
   };
 
   return (
-    <section ref={sectionRef} className="relative overflow-hidden bg-beige">
+    <section ref={sectionRef} className="relative overflow-hidden">
       {/* Faded painting background */}
       <div
         className="pointer-events-none absolute inset-0 bg-painting bg-cover bg-center opacity-[0.03]"

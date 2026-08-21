@@ -1,0 +1,31 @@
+{
+  "originalWidth": 2483,
+  "visibleTop": 921,
+  "visibleBottom": 3679,
+  "layers": [
+    {
+      "name": "far",
+      "top": 921,
+      "rows": 1019,
+      "width": 2887
+    },
+    {
+      "name": "mid",
+      "top": 1210,
+      "rows": 1490,
+      "width": 3257
+    },
+    {
+      "name": "near",
+      "top": 1970,
+      "rows": 1350,
+      "width": 3542
+    },
+    {
+      "name": "front",
+      "top": 2590,
+      "rows": 1992,
+      "width": 4031
+    }
+  ]
+}
