@@ -3,12 +3,8 @@ import { useParams, Link } from "react-router-dom";
 import appsData from "../data/apps.json";
 import { usePageEntrance } from "../components/utils";
 
-// Import app icons — add new imports here when adding apps
-import weeklyRoutineIcon from "../assets/images/weekly-routine-icon.png";
-
-const appIcons = {
-  "weekly-routine": weeklyRoutineIcon,
-};
+// Map app slug -> imported icon asset; apps without one fall back to an initial.
+const appIcons = {};
 
 const AppStoreBadge = ({ url }) => (
   <a
