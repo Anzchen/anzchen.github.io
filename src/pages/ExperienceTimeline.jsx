@@ -5,6 +5,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { TechBadge } from "../components/ui";
 import experienceData from "../data/experience.json";
 import { EASE, DURATION } from "../lib/motion";
+import { clearPanRange, setPan, setPanRange } from "../lib/sceneScroll";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -254,7 +255,7 @@ const sortedExperiencesDescending = [...experienceData].sort((a, b) =>
  */
 const VerticalTimeline = () => {
   return (
-    <section className="min-h-screen bg-beige px-3 py-8 sm:px-6 sm:py-12">
+    <section className="min-h-screen px-3 py-8 sm:px-6 sm:py-12">
       {/* Header */}
       <div className="mx-auto mb-6 max-w-2xl text-center sm:mb-8">
         <h1 className="font-Fraunces text-2xl font-medium text-brown sm:text-4xl md:text-5xl">
@@ -569,6 +570,12 @@ const HorizontalTimeline = () => {
       anticipatePin: 1,
       invalidateOnRefresh: true,
       onRefresh: (self) => {
+        // Tell the ink backdrop which scroll span is pinned, so its camera
+        // pans sideways here instead of diving vertically behind a frozen
+        // viewport. Re-published on every refresh because the pin's length
+        // depends on the card track width.
+        setPanRange(self.start, self.end);
+
         // Restore scroll position after resize using the saved progress from ref
         const currentProgress = scrollProgressRef.current;
         if (currentProgress > 0 && currentProgress < 1) {
@@ -581,6 +588,10 @@ const HorizontalTimeline = () => {
 
         // Save progress for restoration on resize
         scrollProgressRef.current = prog;
+
+        // Drive the backdrop's lateral camera pan from the same progress that
+        // moves the cards, so the scene travels with them rather than against.
+        setPan(prog);
 
         // Update isAtEnd state based on scroll progress
         if (prog >= 0.98 && !isAtEndRef.current) {
@@ -674,6 +685,12 @@ const HorizontalTimeline = () => {
         bounceAnimationRef.current.kill();
         bounceAnimationRef.current = null;
       }
+      // The pin is going away — most often because a resize crossed into the
+      // mobile layout, which renders the vertical timeline instead. A stale
+      // range would leave the backdrop's descent frozen for the rest of the
+      // page, since it subtracts a span that no longer exists.
+      clearPanRange();
+
       // Note: Do NOT call ScrollTrigger.getAll().forEach((t) => t.kill()) here
       // as it would kill ScrollTriggers from other components (like Projects)
     };
@@ -874,7 +891,7 @@ const HorizontalTimeline = () => {
   return (
     <section
       ref={containerRef}
-      className="relative min-h-screen overflow-hidden bg-beige"
+      className="relative min-h-screen overflow-hidden"
     >
       {/* Auto-scroll button - fixed to viewport bottom center */}
       <button

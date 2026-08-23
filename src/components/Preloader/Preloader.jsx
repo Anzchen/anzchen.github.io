@@ -15,6 +15,15 @@ const Preloader = () => {
     // Matters on back-navigation, when Preloader remounts and replays.
     window.__preloaderDone = false;
 
+    // The ink scene almost always finishes compiling before the reveal ends,
+    // so record it rather than only listening — by the time the reveal calls
+    // back, the event has usually already fired.
+    window.__sceneReady = false;
+    const markSceneReady = () => {
+      window.__sceneReady = true;
+    };
+    window.addEventListener("scene:ready", markSceneReady, { once: true });
+
     // Disable browser's automatic scroll restoration
     if ("scrollRestoration" in history) {
       history.scrollRestoration = "manual";
@@ -54,13 +63,39 @@ const Preloader = () => {
 
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("scene:ready", markSceneReady);
       if (lenisRef.current) {
         lenisRef.current.destroy();
       }
     };
   }, []);
 
+  /**
+   * Hold the reveal until the backdrop has drawn its first frame, so the
+   * water effect never unveils an empty canvas. The timeout is the important
+   * half: a slow or failed WebGL init must not strand the page behind the
+   * preloader.
+   */
   const handleRevealComplete = () => {
+    if (window.__sceneReady) {
+      finishHandoff();
+      return;
+    }
+
+    let done = false;
+    const proceed = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      window.removeEventListener("scene:ready", proceed);
+      finishHandoff();
+    };
+
+    const timer = setTimeout(proceed, 1500);
+    window.addEventListener("scene:ready", proceed, { once: true });
+  };
+
+  const finishHandoff = () => {
     setIsRevealing(false);
 
     // Hide preloader

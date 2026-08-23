@@ -149,7 +149,7 @@ const Footer = () => {
   ];
 
   return (
-    <footer ref={footerRef} className="relative flex h-screen w-full flex-col overflow-hidden bg-beige">
+    <footer ref={footerRef} className="relative flex h-screen w-full flex-col overflow-hidden">
       {/* Faded painting background overlay */}
       <div
         className="pointer-events-none absolute inset-0 bg-painting bg-cover bg-center opacity-[0.04]"
@@ -169,8 +169,8 @@ const Footer = () => {
         {/* About text */}
         <p className="max-w-xl text-center text-sm leading-relaxed text-brown/80 sm:text-base">
           This portfolio reflects my journey as a developer and my connection to
-          my Chinese and Taiwanese roots. Built with React, Tailwind CSS, and
-          GSAP, it evolves alongside my growth.
+          my Chinese and Taiwanese roots. Built with React, Tailwind CSS, GSAP,
+          and three.js, it evolves alongside my growth.
         </p>
 
         {/* Social links - larger and more prominent */}
