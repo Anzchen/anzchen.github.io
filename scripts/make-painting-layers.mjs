@@ -85,7 +85,13 @@ const CARVE_SMOOTH = 121;
 const FEATHER_ROWS = 90;
 const BOTTOM_FADE = 300;
 
-/** Left dissolve, replacing the `mask-ink-l` utility, relative to the ORIGINAL width. */
+/**
+ * Left dissolve, relative to the ORIGINAL width.
+ *
+ * This is what keeps the hero's text column on open beige. It used to be a CSS
+ * mask on a DOM element; a mask cannot follow onto a texture, so it is baked in
+ * here and that utility is gone.
+ */
 const MASK_FROM = 0.42;
 /** Right dissolve, so a layer never ends on a hard line if its edge is reached. */
 const MASK_TO = 0.97;

@@ -7,7 +7,6 @@
     "dev": "vite",
     "build": "vite build",
     "icons": "node scripts/make-icons.mjs",
-    "plates": "node scripts/make-plates.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },
