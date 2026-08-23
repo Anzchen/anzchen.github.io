@@ -20,6 +20,7 @@
  * Run: node scripts/merge-expansion.mjs <name> <path-to-generated>
  */
 import sharp from "sharp";
+import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,12 +29,14 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CUTS = join(homedir(), "Documents/painting-cuts");
 const OUT = join(root, "src/assets/painting-src");
 
-/** Width of the crossfade just inside the original's edge. */
-const BLEND = 110;
-
 const [, , name, generatedPath] = process.argv;
 if (!name || !generatedPath) {
   console.error("usage: node scripts/merge-expansion.mjs <name> <path-to-generated>");
+  process.exit(1);
+}
+// Interpolated into read and write paths below, so keep it to a bare layer name.
+if (!/^[a-z]+$/.test(name)) {
+  console.error(`[merge] invalid layer name "${name}" — expected one of far/mid/near/front`);
   process.exit(1);
 }
 
@@ -74,6 +77,25 @@ for (let fx = 0.4; fx <= 1.0001; fx += 0.01) {
     const s = score(fx, fy);
     if (s < best.s) best = { fx, fy, s };
   }
+}
+
+/**
+ * How good the best alignment actually was.
+ *
+ * The search always returns SOME (fx, fy), so without a threshold a wrong layer
+ * name, a wrong file, or an unrelated image produces a confident-looking
+ * "measured original occupies 73% x 61%" and writes a silently corrupt merge.
+ * The score was previously computed and thrown away.
+ */
+const SAMPLES = Math.ceil(PROBE / 2) ** 2;
+const meanAbsDiff = best.s / SAMPLES;
+console.log(`[merge] ${name}: alignment confidence ${meanAbsDiff.toFixed(1)}/255 mean abs diff`);
+if (meanAbsDiff > 12) {
+  console.error(
+    "[merge] alignment failed — is the generated file really an expansion of this layer?",
+    { name, generatedPath, meanAbsDiff: Number(meanAbsDiff.toFixed(1)) }
+  );
+  process.exit(1);
 }
 
 // Scale the generated up so its measured original-region matches native size.
@@ -321,23 +343,17 @@ for (let y = 0; y < finalHeight; y += 1) {
       const dB = growsDown ? (height - y) / DETAIL_BLEND : Infinity;
       const w = smoothstep2(Math.min(1, Math.max(0, Math.min(dR, dB))));
 
-      const edgeDelta = growsRight && growsDown
-        ? (clamp(dRight[c][y]) + clamp(dDown[c][x])) / 2
-        : growsRight
-          ? clamp(dRight[c][y])
-          : growsDown
-            ? clamp(dDown[c][x])
-            : 0;
-
       const detail =
         (originalFull[i + c] - origBase[i + c]) * w +
-        (corrected[i + c] + edgeDelta - genBase[i + c] - edgeDelta) * (1 - w);
+        (corrected[i + c] - genBase[i + c]) * (1 - w);
 
       out[i + c] = Math.min(255, Math.max(0, Math.round(origBase[i + c] + detail)));
     }
   }
 }
 
+// Gitignored, so it does not exist on a fresh clone.
+await mkdir(OUT, { recursive: true });
 const outPath = join(OUT, `${name}.png`);
 await sharp(out, { raw: { width: finalWidth, height: finalHeight, channels: 3 } })
   .png()

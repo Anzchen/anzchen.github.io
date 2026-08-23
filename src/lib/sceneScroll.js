@@ -43,6 +43,14 @@ export const setPanRange = (start, end) => {
 export const clearPanRange = () => {
   panStart = null;
   panEnd = null;
+  /**
+   * Reset the value too, not just the range. updateSceneScroll returns early
+   * when there is no pin, so a stale pan would stick: resizing across the lg
+   * breakpoint while scrolled into the pinned timeline used to leave the camera
+   * with a permanent lateral offset and yaw for the rest of the session, with
+   * no scroll position able to bring it back.
+   */
+  sceneScroll.pan = 0;
 };
 
 /** Published by the pinned trigger on update. */

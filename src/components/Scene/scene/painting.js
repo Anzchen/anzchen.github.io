@@ -51,16 +51,47 @@ const VISIBLE_ROWS = VISIBLE_BOTTOM - VISIBLE_TOP;
  * `top` is the source row each layer starts at, and must match the cutting
  * script — it places the layer vertically.
  */
-const DEPTHS = { far: 34, mid: 26, near: 19, front: 13 };
-
-const LAYERS = manifest.layers.map((layer) => ({ ...layer, depth: DEPTHS[layer.name] }));
+/**
+ * Depths come from the manifest, which the cutting script emits.
+ *
+ * They used to be a hand-maintained table here, duplicating the one in
+ * make-painting-layers.mjs. Renaming or adding a layer there resolved to
+ * undefined here and propagated as NaN into scale and renderOrder, with a
+ * request for "/undefined" for the texture — no error, just a broken scene.
+ * Failing loudly is better: the throw reaches InkScene's catch, which shows the
+ * flat painting AND fires scene:ready.
+ */
+const LAYERS = manifest.layers.map((layer) => {
+  if (!SOURCES[layer.name] || typeof layer.depth !== "number") {
+    throw new Error(
+      `[createPainting] layers.json has no source or depth for "${layer.name}" — regenerate with scripts/make-painting-layers.mjs`
+    );
+  }
+  return layer;
+});
 
 const createLayer = (layer, tanHalfFov, loader, onLoad) => {
   const { name, top, rows, width: sourceWidth, depth } = layer;
 
   const halfHeight = tanHalfFov * depth;
 
-  const texture = loader.load(SOURCES[name], onLoad);
+  /**
+   * onError matters as much as onLoad here. Without it a 404 or a decode
+   * failure never calls settle(), so `pending` never reaches zero and
+   * scene:ready is never dispatched — silently. The preloader's own timeout
+   * still reveals the page, so the visitor gets a landscape missing a depth
+   * plane and nothing is logged anywhere.
+   */
+  const texture = loader.load(SOURCES[name], onLoad, undefined, (error) => {
+    console.error("[createLayer] painting layer failed to load:", {
+      name,
+      url: SOURCES[name],
+      error,
+    });
+    // Settle anyway: a missing layer is degradation, a scene that never
+    // announces is a page that never reveals.
+    onLoad();
+  });
   texture.colorSpace = SRGBColorSpace;
   texture.wrapS = ClampToEdgeWrapping;
   texture.wrapT = ClampToEdgeWrapping;

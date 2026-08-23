@@ -38,10 +38,7 @@ const FOG_DENSITY = 0.012;
 
 const FOV = 42;
 
-export const createInkScene = (canvas, { reducedMotion = false, fadeTarget = null } = {}) => {
-  // The element carrying the published scroll custom property. Defaults to the
-  // canvas so the scene still works standalone.
-  const backdrop = fadeTarget || canvas;
+export const createInkScene = (canvas, { reducedMotion = false } = {}) => {
 
   const renderer = new WebGLRenderer({
     canvas,
@@ -93,8 +90,22 @@ export const createInkScene = (canvas, { reducedMotion = false, fadeTarget = nul
   let frame = null;
   let running = false;
   let announced = false;
+  /**
+   * Latched by dispose(). Texture decode is async and this scene only wraps
+   * "/", so navigating away mid-load lands a settle() callback after teardown:
+   * without this, that callback renders against a disposed renderer and
+   * announces scene:ready for a scene that no longer exists.
+   */
+  let disposed = false;
 
-  const draw = () => {
+  /**
+   * Declared as a function rather than a const so it is hoisted. It is captured
+   * by the texture-load callback above, which is created before this point —
+   * safe today only because decode is async, and not safe at all if anything
+   * between them throws.
+   */
+  function draw() {
+    if (disposed) return;
     // Clouds ride with the camera rather than sitting at fixed world heights.
     clouds.follow(camera.position.y);
     renderer.render(scene, camera);
@@ -106,7 +117,7 @@ export const createInkScene = (canvas, { reducedMotion = false, fadeTarget = nul
       // Lets the preloader hold its reveal until there is something to reveal.
       window.dispatchEvent(new Event("scene:ready"));
     }
-  };
+  }
 
   let lastTime = 0;
   let elapsed = 0;
@@ -138,6 +149,14 @@ export const createInkScene = (canvas, { reducedMotion = false, fadeTarget = nul
     elapsed += delta;
 
     rig.update(sceneScroll.descend, sceneScroll.pan);
+    /**
+     * Applies each layer's lateral follow. A no-op while every layer has
+     * enough painting past the composition to parallax freely (all four
+     * currently compute follow = 0), but the guard exists for the case where
+     * one does not — and unapplied it would fail OPEN, walking that layer's
+     * right edge into frame.
+     */
+    painting.setPan(camera.position.x);
     motes.update(delta, elapsed);
     draw();
   };
@@ -184,18 +203,13 @@ export const createInkScene = (canvas, { reducedMotion = false, fadeTarget = nul
    */
   const DEEPEN_FROM = 0.82;
 
-  /** Published for CSS; must not grow without bound. */
-  const PROGRESS_MAX = 1.25;
-
   let lastThicken = -1;
   let lastDeepen = -1;
-  let lastHeroProgress = -1;
 
   const syncScroll = () => {
     updateSceneScroll();
 
     const raw = window.scrollY / Math.max(window.innerHeight, 1);
-    const heroProgress = Math.min(raw, PROGRESS_MAX);
 
     const t = Math.min(1, Math.max(0, (raw - RECEDE_FROM) / (RECEDE_TO - RECEDE_FROM)));
     const thicken = t * t * (3 - 2 * t); // smoothstep
@@ -205,11 +219,6 @@ export const createInkScene = (canvas, { reducedMotion = false, fadeTarget = nul
     const docProgress = window.scrollY / scrollable;
     const d = Math.min(1, Math.max(0, (docProgress - DEEPEN_FROM) / (1 - DEEPEN_FROM)));
     const deepen = d * d * (3 - 2 * d);
-
-    if (Math.abs(heroProgress - lastHeroProgress) > 0.002) {
-      backdrop.style.setProperty("--scroll-progress", heroProgress.toFixed(4));
-      lastHeroProgress = heroProgress;
-    }
 
     // Only touch the materials when it actually moves — this runs on every
     // scroll event.
@@ -240,12 +249,20 @@ export const createInkScene = (canvas, { reducedMotion = false, fadeTarget = nul
     else if (!reducedMotion) start();
   };
 
-  window.addEventListener("scroll", onScroll, { passive: true });
-  window.addEventListener("resize", onResize);
-  document.addEventListener("visibilitychange", onVisibility);
-
   updateSceneScroll();
   rig.update(sceneScroll.descend, sceneScroll.pan, true);
+
+  /**
+   * Bound AFTER the warm-up below. Registered before it, a throw in draw() or
+   * layout would leave three listeners attached to a dead scene for the life of
+   * the page: InkScene catches, swaps in the flat fallback, and never runs the
+   * effect cleanup that would have removed them.
+   */
+  const bindListeners = () => {
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onResize);
+    document.addEventListener("visibilitychange", onVisibility);
+  };
 
   if (reducedMotion) {
     // Compose the scene once and leave it. Still an image, never a moving one.
@@ -255,8 +272,11 @@ export const createInkScene = (canvas, { reducedMotion = false, fadeTarget = nul
     start();
   }
 
+  bindListeners();
+
   return {
     dispose() {
+      disposed = true;
       stop();
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onResize);
@@ -265,6 +285,13 @@ export const createInkScene = (canvas, { reducedMotion = false, fadeTarget = nul
       clouds.dispose();
       motes.dispose();
       renderer.dispose();
+      /**
+       * dispose() frees GPU-side resources but leaves the WebGL context alive.
+       * Only "/" mounts this scene, so every navigation away and back orphans
+       * one: Chrome keeps about 16 before force-losing the oldest, and the
+       * symptom is a hero that goes blank after a few round trips.
+       */
+      renderer.forceContextLoss();
     },
   };
 };

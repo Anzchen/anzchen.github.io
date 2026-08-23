@@ -31,10 +31,7 @@ const InkScene = () => {
     import("./scene/createInkScene")
       .then(({ createInkScene }) => {
         if (cancelled || !canvasRef.current) return;
-        scene = createInkScene(canvasRef.current, {
-          reducedMotion,
-          fadeTarget: backdropRef.current,
-        });
+        scene = createInkScene(canvasRef.current, { reducedMotion });
       })
       .catch((error) => {
         console.error("[InkScene] scene failed to initialise:", { error });
