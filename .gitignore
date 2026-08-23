@@ -27,9 +27,12 @@ dist-ssr
 *.sln
 *.sw?
 
-# Merged AI-expanded painting sources (33MB) and the retired ink-plate art.
-# Build inputs for scripts/make-painting-layers.mjs, not needed to build the
-# site: the shipped layers in src/assets/painting/ are committed. Originals
-# live in ~/Documents/painting-cuts/.
+# Merged AI-expanded painting sources (33MB). Build input for
+# scripts/make-painting-layers.mjs, not needed to build the site: the shipped
+# layers in src/assets/painting/ are committed. Originals and the AI outputs
+# they were merged from live in ~/Documents/painting-cuts/.
 src/assets/painting-src/
+
+# Retired ink-plate art, kept only so a leftover local copy is not committed.
+# The plates were dropped from the design and their build script is gone.
 src/assets/plates-src/
