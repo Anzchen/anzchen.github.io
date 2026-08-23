@@ -164,7 +164,9 @@ const ProjectCard = forwardRef(({ project, imageUrl, posterUrl }, ref) => {
             </ul>
           </div>
 
-          {/* Action links */}
+          {/* Action links — the whole row goes when a project has none, so a
+              retired project doesn't render an orphan rule over dead space. */}
+          {(project.github || posterUrl || project.appPage || project.demo) && (
           <div className="flex flex-wrap gap-2 border-t border-brown/10 pt-3">
           {project.github && (
             <a
@@ -247,6 +249,7 @@ const ProjectCard = forwardRef(({ project, imageUrl, posterUrl }, ref) => {
             </a>
           )}
         </div>
+          )}
         </div>
       </div>
     </article>
