@@ -70,8 +70,8 @@
   {
     "id": "project5",
     "title": "Weekly Routine",
-    "description": "A mobile-first web app for staying on track with your weekly schedule, diet, and fitness. Plan meals with macro tracking, log workouts, manage supplements, and organize your week with fixed time blocks and flexible tasks. Works without an account, with optional cloud sync across devices.",
-    "shortDescription": "Stay on track with your diet, macros, workouts, and weekly schedule. No ads, no tracking — just your routine.",
+    "description": "A mobile-first PWA for planning a week: meals with macro tracking, workouts, supplements, and a mix of fixed time blocks and flexible tasks. It ran without an account and synced across devices once you signed in.\n\nMost of the work went into the parts nobody sees. Offline-first meant the service worker had to hand off cleanly on update, which took explicitly activating the waiting worker before reload rather than trusting the reload to do it. A global banner surfaced offline and sync-error states instead of letting writes fail quietly. Sign-out got its own timeout so a dead network could not hang the app. Installed iOS PWAs also leave a viewport gap at the bottom that never appears in a browser tab, which took a while to isolate.\n\nI no longer use it. I built it to help me stick to a routine, and routines change quickly. Once I had the hang of mine and it actually held, the app was not necessary anymore. It stays here as a project, not a product.",
+    "shortDescription": "A weekly planner PWA I built for myself. Routines change fast, and once mine stuck the app stopped being necessary.",
     "techstack": "Built with TypeScript and React using Vite, styled with Tailwind CSS, backed by Supabase for auth and data sync, and Zustand for client-side state management.",
     "technologies": [
       "TypeScript",
@@ -84,9 +84,9 @@
     ],
     "image": "Project5_Cover1280.png",
     "github": null,
-    "demo": "https://weeklyroutine.vercel.app",
-    "appPage": "/apps/weekly-routine",
-    "demoLabel": "Try it",
+    "demo": null,
+    "appPage": null,
+    "demoLabel": null,
     "poster": null,
     "theme": "default"
   }
