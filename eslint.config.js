@@ -5,9 +5,16 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 
 export default [
+  /**
+   * Global ignore. In flat config an `ignores` key alongside `files` only
+   * excludes those paths from THAT config object, so build output was still
+   * being linted by every other one — 18 of the repo's errors came from
+   * minified bundles in dist/. A config with `ignores` and nothing else is
+   * what applies globally.
+   */
+  { ignores: ['dist/**'] },
   {
     files: ['**/*.{js,jsx}'],
-    ignores: ['dist'],
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,

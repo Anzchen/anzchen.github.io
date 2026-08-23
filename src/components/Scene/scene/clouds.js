@@ -72,11 +72,14 @@ export const createClouds = (tanHalfFov) => {
     });
     /**
      * A cloned texture shares the image but keeps its own offset, so each band
-     * drifts at its own rate off a single decode — and, more importantly, reads
-     * a DIFFERENT lane of the texture. Every band used to sample the same one,
-     * so all five drew identical shapes stacked on each other: that adds
-     * opacity but no volume, which is why the field looked flat however dense
-     * it got.
+     * reads a different lane off a single decode. Every band used to sample the
+     * same one, so all five drew identical shapes stacked on each other: that
+     * adds opacity but no volume, which is why the field looked flat however
+     * dense it got.
+     *
+     * Five bands over three lanes, so bands 0/3 and 1/4 do repeat a lane. They
+     * sit at widely separated depths (8 and 22, 11 and 30), far enough apart in
+     * scale that the repeat does not read.
      */
     material.map.wrapS = RepeatWrapping;
     material.map.repeat.set(1, 1 / CLOUD_LANES);

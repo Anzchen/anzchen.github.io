@@ -27,50 +27,27 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  BOTTOM_FADE,
+  LAYERS,
+  ORIGINAL_WIDTH,
+  PAN_DISTANCE,
+  VISIBLE_BOTTOM,
+  VISIBLE_TOP,
+  fadeFromFor,
+  worldPerPixel,
+} from "./painting-geometry.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = join(root, "src/assets/painting-src");
 const OUT = join(root, "src/assets/painting");
 
 /**
- * Width of the painted field in the original scroll, measured off the source.
- * The expansions extend past it; this is still what gets aligned to the frame's
- * right edge, so new painting sits OUTSIDE the composition as headroom rather
- * than pushing it left.
+ * Margin past the strict pan requirement when trimming, so a layer's own edge
+ * is never the binding case. A generative expansion does not respect the size
+ * it was asked for, and everything past the camera's reach renders at zero
+ * alpha forever while stealing resolution from the part that is visible.
  */
-const ORIGINAL_WIDTH = 2483;
-
-/** Rows the desktop hero shows, from the original `bg-cover` framing. */
-export const VISIBLE_TOP = 921;
-export const VISIBLE_BOTTOM = 3679;
-const VISIBLE_ROWS = VISIBLE_BOTTOM - VISIBLE_TOP;
-
-/**
- * `srcTop` is the painting row each source begins at, `seam` the nominal row
- * the layer should start being visible, and `fadeFrom` where it dissolves once
- * the next layer forward has taken over.
- */
-const LAYERS = [
-  { name: "far", srcTop: 921, seam: 921, carve: false, fadeFrom: 1640, base: 1100, depth: 34 },
-  { name: "mid", srcTop: 1210, seam: 1380, carve: true, fadeFrom: 2400, base: 1300, depth: 26 },
-  { name: "near", srcTop: 1970, seam: 2140, carve: true, fadeFrom: 3020, base: 1500, depth: 19 },
-  { name: "front", srcTop: 2590, seam: 2760, carve: true, fadeFrom: null, base: 1500, depth: 13 },
-];
-
-/**
- * Trim each source to the part that can actually reach the screen.
- *
- * A generative expansion does not respect the size it was asked for: the `mid`
- * source came back 6208x3365 against a request for 3043x1817. Everything past
- * the camera's lateral reach, and everything below the layer's own bottom
- * dissolve, renders at zero alpha forever. Carrying it costs file size and,
- * worse, steals resolution from the part that is visible, since the output is
- * scaled to a fixed width.
- */
-const FOV = 42;
-const TAN_HALF_FOV = Math.tan((FOV / 2) * (Math.PI / 180));
-const PAN_DISTANCE = 3.5;
-/** Margin past the strict pan requirement, so the edge is never the binding case. */
 const PAN_MARGIN = 1.6;
 
 const CARVE_WINDOW = 170;
@@ -83,7 +60,6 @@ const CARVE_SMOOTH = 121;
  * thickness of the painting's own mist bands.
  */
 const FEATHER_ROWS = 90;
-const BOTTOM_FADE = 300;
 
 /**
  * Left dissolve, relative to the ORIGINAL width.
@@ -146,10 +122,9 @@ const build = async ({ name, srcTop, seam: seamRow, carve, fadeFrom, base, depth
   const meta = await sharp(file).metadata();
 
   // World units per source pixel at this layer's depth.
-  const worldPerPixel = (2 * TAN_HALF_FOV * depth) / VISIBLE_ROWS;
   const maxCols = Math.min(
     meta.width,
-    ORIGINAL_WIDTH + Math.ceil((PAN_DISTANCE / worldPerPixel) * PAN_MARGIN)
+    ORIGINAL_WIDTH + Math.ceil((PAN_DISTANCE / worldPerPixel(depth)) * PAN_MARGIN)
   );
   const maxRows = Math.min(meta.height, fadeFrom ? fadeFrom + BOTTOM_FADE - srcTop : meta.height);
 
@@ -164,6 +139,14 @@ const build = async ({ name, srcTop, seam: seamRow, carve, fadeFrom, base, depth
     );
   }
   const { data, info } = await source.clone().raw().toBuffer({ resolveWithObject: true });
+  /**
+   * removeAlpha() strips alpha but does not promise three channels: a greyscale
+   * source yields one, and every +1/+2 read below would then cross into the
+   * next pixel. No crash, just silently wrong output.
+   */
+  if (info.channels !== 3) {
+    throw new Error(`[painting] ${name}: expected 3 channels, got ${info.channels} — is the source greyscale?`);
+  }
   const grey = await source.clone().greyscale().raw().toBuffer();
 
   const w = info.width;
@@ -215,10 +198,20 @@ const build = async ({ name, srcTop, seam: seamRow, carve, fadeFrom, base, depth
     if (output.length <= BUDGET_BYTES) break;
   }
 
+  if (output.length > BUDGET_BYTES) {
+    console.warn(
+      `[painting] ${name}: OVER BUDGET at the lowest quality — ${(output.length / 1024).toFixed(1)} KB ` +
+        `vs ${(BUDGET_BYTES / 1024).toFixed(0)} KB. Lower its \`base\` width in painting-geometry.mjs.`
+    );
+  }
+
   await sharp(output).toFile(join(OUT, `${name}.webp`));
 
-  const lo = seam ? Math.round(Math.min(...seam)) + srcTop : seamRow;
-  const hi = seam ? Math.round(Math.max(...seam)) + srcTop : seamRow;
+  // reduce, not Math.min(...seam): the spread is a per-argument call and this
+  // array is as wide as the source, so it grows toward the argument limit as
+  // depths or PAN_MARGIN change.
+  const lo = seam ? Math.round(seam.reduce((a, b) => Math.min(a, b), Infinity)) + srcTop : seamRow;
+  const hi = seam ? Math.round(seam.reduce((a, b) => Math.max(a, b), -Infinity)) + srcTop : seamRow;
   console.log(
     `[painting] ${name}: source ${w}x${h} (rows ${srcTop}-${srcTop + h}), ` +
       `seam ${carve ? `${lo}-${hi} carved` : `${seamRow} ruled`}, ` +
@@ -231,7 +224,11 @@ const build = async ({ name, srcTop, seam: seamRow, carve, fadeFrom, base, depth
 await mkdir(OUT, { recursive: true });
 
 const manifest = [];
-for (const layer of LAYERS) manifest.push(await build(layer));
+for (let i = 0; i < LAYERS.length; i += 1) {
+  // Each layer dissolves once the next one has taken over; the frontmost runs
+  // to the bottom of the painting, since nothing is in front of it.
+  manifest.push(await build({ ...LAYERS[i], fadeFrom: fadeFromFor(i) }));
+}
 
 await writeFile(
   join(OUT, "layers.json"),
