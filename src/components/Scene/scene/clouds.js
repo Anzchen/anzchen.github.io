@@ -37,7 +37,7 @@ import { CLOUD_LANES, makeCloudTexture } from "./textures";
  * behind keep their separation instead of the whole scene going flat.
  */
 const BANDS = [
-  { depth: 8, yFrac: -0.1, heightFrac: 1.5, base: 0.0, gain: 0.8, deep: 0.3 },
+  { depth: 8, yFrac: -0.1, heightFrac: 1.5, base: 0.0, gain: 0.72, deep: 0.28 },
   { depth: 11, yFrac: -0.42, heightFrac: 1.05, base: 0.3, gain: 0.4 },
   { depth: 16, yFrac: -0.3, heightFrac: 1.0, base: 0.34, gain: 0.36 },
   { depth: 22, yFrac: -0.16, heightFrac: 0.95, base: 0.34, gain: 0.26 },
@@ -129,7 +129,13 @@ export const createClouds = (tanHalfFov) => {
      */
     setThicken(t, deep = 0) {
       bands.forEach((band) => {
-        band.material.opacity = band.base + band.gain * t + (band.deep || 0) * deep;
+        /**
+         * Clamped, and the values above are sized to land under 1 on their own.
+         * Band 0 previously summed to 1.1, so alpha saturated at deep ~0.67 and
+         * the last third of the footer ramp silently did nothing.
+         */
+        const opacity = band.base + band.gain * t + (band.deep || 0) * deep;
+        band.material.opacity = Math.min(1, opacity);
       });
     },
 

@@ -7,25 +7,29 @@
       "name": "far",
       "top": 921,
       "rows": 1019,
-      "width": 2887
+      "width": 2887,
+      "depth": 34
     },
     {
       "name": "mid",
       "top": 1210,
       "rows": 1490,
-      "width": 3257
+      "width": 3257,
+      "depth": 26
     },
     {
       "name": "near",
       "top": 1970,
       "rows": 1350,
-      "width": 3542
+      "width": 3542,
+      "depth": 19
     },
     {
       "name": "front",
       "top": 2590,
       "rows": 1992,
-      "width": 4031
+      "width": 4031,
+      "depth": 13
     }
   ]
 }

@@ -225,7 +225,7 @@ const build = async ({ name, srcTop, seam: seamRow, carve, fadeFrom, base, depth
       `opaque ${((100 * covered) / (w * h)).toFixed(1)}%, q${used}, ${(output.length / 1024).toFixed(1)} KB`
   );
 
-  return { name, top: srcTop, rows: h, width: w };
+  return { name, top: srcTop, rows: h, width: w, depth };
 };
 
 await mkdir(OUT, { recursive: true });
