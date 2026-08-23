@@ -10,9 +10,9 @@ const InkScene = lazy(() => import("../components/Scene/InkScene"));
 const PageLayout = () => {
   return (
     <div className="bg-beige font-light text-brown">
-      {/* Fixed backdrop at z-0. Every section below the hero carries its own
-          opaque bg-beige, so they occlude the canvas as they scroll over it —
-          no stacking work needed, and the scene stops rendering once covered. */}
+      {/* The scene sits behind everything and stays visible the whole way down —
+          the sections no longer carry an opaque bg-beige to occlude it. Cloud
+          cover, thickening with scroll, is what pushes it back behind content. */}
       <Suspense fallback={null}>
         <InkScene />
       </Suspense>

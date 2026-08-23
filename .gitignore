@@ -33,6 +33,3 @@ dist-ssr
 # they were merged from live in ~/Documents/painting-cuts/.
 src/assets/painting-src/
 
-# Retired ink-plate art, kept only so a leftover local copy is not committed.
-# The plates were dropped from the design and their build script is gone.
-src/assets/plates-src/

@@ -25,50 +25,38 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  BOTTOM_FADE,
+  CROP_BOTTOM,
+  CROP_LEFT,
+  LAYERS,
+  ORIGINAL_WIDTH,
+  PAN_DISTANCE,
+  fadeFromFor,
+  riseRows,
+  worldPerPixel,
+} from "./painting-geometry.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = join(root, "src/assets/images/background2560.webp");
 const OUT = join(homedir(), "Documents/painting-cuts");
 
-/** Must match make-painting-layers.mjs. */
-const CROP_LEFT = 39;
-const CROP_RIGHT = 2522;
-const CROP_BOTTOM = 4562;
-const SOURCE_WIDTH = CROP_RIGHT - CROP_LEFT;
-const VISIBLE_ROWS = 3679 - 921;
-const BOTTOM_FADE = 300;
-
-/** Bands as the cutter currently produces them, with their scene depths. */
-const LAYERS = [
-  { name: "far", top: 921, bottom: 1940, depth: 34 },
-  { name: "mid", top: 1210, bottom: 2700, depth: 26 },
-  { name: "near", top: 1970, bottom: 3320, depth: 19 },
-  { name: "front", top: 2590, bottom: CROP_BOTTOM, depth: 13 },
-];
-
-/** Straight from cameraPath.js. */
-const PAN_DISTANCE = 3.5;
-const RISE = 3.0;
-const DOLLY = 3.6;
-const FOV = 42;
-const TAN_HALF_FOV = Math.tan((FOV / 2) * (Math.PI / 180));
-
 /** Breathing room, since the eased camera overshoots its target slightly. */
 const SAFETY = 1.15;
-
-/** On-screen rise of a layer at full scroll, in source rows. */
-const riseRows = (depth) => (RISE / (TAN_HALF_FOV * (depth - DOLLY)) / 2) * VISIBLE_ROWS;
 
 await mkdir(OUT, { recursive: true });
 
 const spec = [];
 
 for (let i = 0; i < LAYERS.length; i += 1) {
-  const { name, top, bottom, depth } = LAYERS[i];
+  const { name, srcTop: top, depth } = LAYERS[i];
+  // Where this band stops carrying content, from the shared geometry.
+  const fadeFrom = fadeFromFor(i);
+  const bottom = Math.min(CROP_BOTTOM, fadeFrom ? fadeFrom + BOTTOM_FADE : CROP_BOTTOM);
   const height = bottom - top;
 
   await sharp(SRC)
-    .extract({ left: CROP_LEFT, top, width: SOURCE_WIDTH, height })
+    .extract({ left: CROP_LEFT, top, width: ORIGINAL_WIDTH, height })
     .png()
     .toFile(join(OUT, `${name}.png`));
 
@@ -76,22 +64,22 @@ for (let i = 0; i < LAYERS.length; i += 1) {
    * World units per source pixel scale with depth, so the same 3.5-unit pan
    * costs the nearest band nearly three times the pixels of the farthest.
    */
-  const worldPerPixel = (2 * TAN_HALF_FOV * depth) / VISIBLE_ROWS;
-  const expandRight = Math.ceil((PAN_DISTANCE / worldPerPixel) * SAFETY);
+  const expandRight = Math.ceil((PAN_DISTANCE / worldPerPixel(depth)) * SAFETY);
 
-  // How far this band separates from the layer in front of it.
-  const inFront = LAYERS[i - 1 >= 0 ? i - 1 : 0];
-  const separation = i === 0 ? 0 : Math.abs(riseRows(depth) - riseRows(LAYERS[i - 1].depth));
+  // How far this band separates from the layer in front of it. The backmost
+  // has nothing in front, so it has no separation to cover.
+  const inFront = i > 0 ? LAYERS[i - 1] : null;
+  const separation = inFront ? Math.abs(riseRows(depth) - riseRows(inFront.depth)) : 0;
   const expandDown =
     name === "front" ? 0 : Math.ceil((separation + BOTTOM_FADE) * SAFETY + 300);
 
-  spec.push({ name, width: SOURCE_WIDTH, height, expandRight, expandDown });
+  spec.push({ name, width: ORIGINAL_WIDTH, height, expandRight, expandDown });
 
   console.log(
-    `[cuts] ${name}.png  ${SOURCE_WIDTH}x${height}  →  right +${expandRight}  down +${expandDown}  ` +
-      `(final ${SOURCE_WIDTH + expandRight}x${height + expandDown})`
+    `[cuts] ${name}.png  ${ORIGINAL_WIDTH}x${height}  →  right +${expandRight}  down +${expandDown}  ` +
+      `(final ${ORIGINAL_WIDTH + expandRight}x${height + expandDown})`
   );
-  if (expandDown) {
+  if (expandDown && inFront) {
     console.log(
       `        separates ${Math.round(separation)} rows from ${inFront.name}, dissolve ${BOTTOM_FADE}`
     );

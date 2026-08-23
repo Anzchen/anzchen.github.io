@@ -8,6 +8,8 @@ const Preloader = () => {
   const preloaderRef = useRef(null);
   const [isRevealing, setIsRevealing] = useState(true);
   const lenisRef = useRef(null);
+  const handoffTimer = useRef(null);
+  const handoffCleanup = useRef(null);
 
   useLayoutEffect(() => {
     // This preloader instance has not completed yet — reset the handoff flag
@@ -64,6 +66,10 @@ const Preloader = () => {
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
       window.removeEventListener("scene:ready", markSceneReady);
+      // Cancel any pending handoff first: it calls back into the Lenis
+      // instance destroyed on the next line.
+      handoffCleanup.current?.();
+      handoffCleanup.current = null;
       if (lenisRef.current) {
         lenisRef.current.destroy();
       }
@@ -86,12 +92,23 @@ const Preloader = () => {
     const proceed = () => {
       if (done) return;
       done = true;
-      clearTimeout(timer);
+      clearTimeout(handoffTimer.current);
+      handoffTimer.current = null;
       window.removeEventListener("scene:ready", proceed);
       finishHandoff();
     };
 
-    const timer = setTimeout(proceed, 1500);
+    /**
+     * Tracked on a ref so unmount can cancel it. Left loose, the timer fires
+     * after the effect cleanup has already destroyed the Lenis instance, and
+     * finishHandoff then calls start() and on("scroll") against it.
+     */
+    handoffTimer.current = setTimeout(proceed, 1500);
+    handoffCleanup.current = () => {
+      clearTimeout(handoffTimer.current);
+      handoffTimer.current = null;
+      window.removeEventListener("scene:ready", proceed);
+    };
     window.addEventListener("scene:ready", proceed, { once: true });
   };
 

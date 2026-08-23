@@ -72,7 +72,22 @@ export const createInkScene = (canvas, { reducedMotion = false } = {}) => {
   const motes = createMotes(INK, { mobile: window.innerWidth <= 640 });
   scene.add(motes.object);
 
+  /**
+   * scrollHeight forces layout, and syncScroll reads it on every scroll event
+   * while GSAP is writing transforms on the same tick — style invalidation
+   * followed by a layout read is textbook thrash. It only changes on resize and
+   * on ScrollTrigger refresh, so cache it and invalidate there.
+   */
+  let scrollableCache = null;
+  const scrollable = () => {
+    if (scrollableCache === null) {
+      scrollableCache = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    }
+    return scrollableCache;
+  };
+
   const resize = () => {
+    scrollableCache = null;
     const { innerWidth: w, innerHeight: h } = window;
     // Mobile GPUs get a lower ceiling; a retina phone at full DPR is a lot of
     // fragments for a backdrop nobody is looking at directly.
@@ -215,8 +230,7 @@ export const createInkScene = (canvas, { reducedMotion = false } = {}) => {
     const thicken = t * t * (3 - 2 * t); // smoothstep
 
     // Progress through the WHOLE document, which is what the footer needs.
-    const scrollable = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-    const docProgress = window.scrollY / scrollable;
+    const docProgress = window.scrollY / scrollable();
     const d = Math.min(1, Math.max(0, (docProgress - DEEPEN_FROM) / (1 - DEEPEN_FROM)));
     const deepen = d * d * (3 - 2 * d);
 
@@ -233,10 +247,23 @@ export const createInkScene = (canvas, { reducedMotion = false } = {}) => {
   };
 
   const onScroll = () => syncScroll();
+
+  /**
+   * Coalesced to one frame. resize() reallocates the framebuffer and relays out
+   * every layer, and iOS Safari fires resize continuously as the URL bar
+   * collapses mid-scroll — App.jsx already sets ScrollTrigger's
+   * ignoreMobileResize for exactly that, and the scene needs the same guard.
+   */
+  let resizeFrame = null;
   const onResize = () => {
-    resize();
-    syncScroll();
-    if (!running) draw();
+    if (resizeFrame !== null) return;
+    resizeFrame = requestAnimationFrame(() => {
+      resizeFrame = null;
+      if (disposed) return;
+      resize();
+      syncScroll();
+      if (!running) draw();
+    });
   };
 
   /**
@@ -277,6 +304,7 @@ export const createInkScene = (canvas, { reducedMotion = false } = {}) => {
   return {
     dispose() {
       disposed = true;
+      if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
       stop();
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onResize);

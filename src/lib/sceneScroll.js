@@ -40,6 +40,20 @@ export const setPanRange = (start, end) => {
 };
 
 /** Cleared when the pin goes away — e.g. crossing to the mobile layout. */
+/**
+ * scrollHeight forces layout and this runs on every scroll event. It only
+ * changes when the document does, so cache it and let a resize invalidate.
+ */
+let scrollableCache = null;
+const scrollableHeight = () =>
+  scrollableCache ?? (scrollableCache = document.documentElement.scrollHeight - window.innerHeight);
+
+if (typeof window !== "undefined") {
+  window.addEventListener("resize", () => {
+    scrollableCache = null;
+  });
+}
+
 export const clearPanRange = () => {
   panStart = null;
   panEnd = null;
@@ -68,7 +82,7 @@ export const setPan = (progress) => {
 const travelLength = () => {
   const total = Math.max(
     1,
-    document.documentElement.scrollHeight - window.innerHeight
+    scrollableHeight()
   );
   const pinned = panStart !== null ? panEnd - panStart : 0;
   return Math.max(1, total - pinned);

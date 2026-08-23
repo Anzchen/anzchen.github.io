@@ -121,13 +121,37 @@ const gC = gRaw.info.channels;
 const width = oRaw.info.width;
 const height = oRaw.info.height;
 
-const histogram = (data, w, channels, pixels) => {
-  const h = [new Uint32Array(256), new Uint32Array(256), new Uint32Array(256)];
-  for (const [x, y] of pixels) {
-    const i = (y * w + x) * channels;
-    for (let c = 0; c < 3; c += 1) h[c][data[i + c]] += 1;
+/**
+ * removeAlpha() strips alpha but does not promise three channels: a greyscale
+ * input yields one, and every +1/+2 read below would then cross into the next
+ * pixel. Silently wrong output rather than a crash, so assert it.
+ */
+for (const [label, ch] of [["original", oC], ["generated", gC]]) {
+  if (ch !== 3) {
+    console.error(`[merge] ${label} image has ${ch} channels, expected 3 (RGB) — is it greyscale?`);
+    process.exit(1);
   }
-  return h;
+}
+
+/**
+ * Accumulates directly over a region rather than over a list of coordinates.
+ *
+ * The previous version built arrays of [x, y] pairs first: on a 4000x4600 frame
+ * that is millions of heap-allocated two-element arrays, hundreds of megabytes,
+ * to feed a loop that reads each one once and drops it.
+ *
+ * @param {(x: number, y: number) => boolean} include
+ */
+const histogram = (data, w, h, channels, step, include) => {
+  const out = [new Uint32Array(256), new Uint32Array(256), new Uint32Array(256)];
+  for (let y = 0; y < h; y += step) {
+    for (let x = 0; x < w; x += step) {
+      if (!include(x, y)) continue;
+      const i = (y * w + x) * channels;
+      for (let c = 0; c < 3; c += 1) out[c][data[i + c]] += 1;
+    }
+  }
+  return out;
 };
 
 const percentile = (hist, p) => {
@@ -148,18 +172,18 @@ const percentile = (hist, p) => {
  * correction needed: the model keeps the copied part close to the source and
  * renders only the new painting heavier.
  */
-const newPixels = [];
+/** Is this pixel outside the original, i.e. newly painted? */
+const isNew = (x, y) => x >= width || y >= height;
+let newCount = 0;
 for (let y = 0; y < finalHeight; y += 3) {
-  for (let x = 0; x < finalWidth; x += 3) if (x >= width || y >= height) newPixels.push([x, y]);
+  for (let x = 0; x < finalWidth; x += 3) if (isNew(x, y)) newCount += 1;
 }
-const oldPixels = [];
-for (let y = 0; y < height; y += 3) for (let x = 0; x < width; x += 3) oldPixels.push([x, y]);
 
 const corrected = Buffer.alloc(finalWidth * finalHeight * 3);
 
-if (newPixels.length > 0) {
-  const gHist = histogram(gData, finalWidth, gC, newPixels);
-  const oHist = histogram(oData, width, oC, oldPixels);
+if (newCount > 0) {
+  const gHist = histogram(gData, finalWidth, finalHeight, gC, 3, isNew);
+  const oHist = histogram(oData, width, height, oC, 3, () => true);
 
   /**
    * Percentile matching rather than mean and standard deviation: the fault is
