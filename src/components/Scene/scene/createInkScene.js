@@ -95,6 +95,8 @@ export const createInkScene = (canvas, { reducedMotion = false, fadeTarget = nul
   let announced = false;
 
   const draw = () => {
+    // Clouds ride with the camera rather than sitting at fixed world heights.
+    clouds.follow(camera.position.y);
     renderer.render(scene, camera);
     // Gated on the painting: the first frame now happens before the textures
     // decode, and announcing there would reveal a bare beige field with the
@@ -137,7 +139,6 @@ export const createInkScene = (canvas, { reducedMotion = false, fadeTarget = nul
 
     rig.update(sceneScroll.descend, sceneScroll.pan);
     motes.update(delta, elapsed);
-    clouds.update(elapsed);
     draw();
   };
 
@@ -172,10 +173,22 @@ export const createInkScene = (canvas, { reducedMotion = false, fadeTarget = nul
   const RECEDE_FROM = 0.25;
   const RECEDE_TO = 1.0;
 
+  /**
+   * A second recession over the last stretch of the document.
+   *
+   * The ramp above is spent within the first viewport and then holds flat for
+   * the remaining eleven. That is right for the sections in between, and not
+   * enough for the footer: by then the lateral pan has carried the painting's
+   * densest passage into the middle of the frame, right under the contact
+   * details, which are small text over foliage rather than headings over mist.
+   */
+  const DEEPEN_FROM = 0.82;
+
   /** Published for CSS; must not grow without bound. */
   const PROGRESS_MAX = 1.25;
 
   let lastThicken = -1;
+  let lastDeepen = -1;
   let lastHeroProgress = -1;
 
   const syncScroll = () => {
@@ -187,6 +200,12 @@ export const createInkScene = (canvas, { reducedMotion = false, fadeTarget = nul
     const t = Math.min(1, Math.max(0, (raw - RECEDE_FROM) / (RECEDE_TO - RECEDE_FROM)));
     const thicken = t * t * (3 - 2 * t); // smoothstep
 
+    // Progress through the WHOLE document, which is what the footer needs.
+    const scrollable = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    const docProgress = window.scrollY / scrollable;
+    const d = Math.min(1, Math.max(0, (docProgress - DEEPEN_FROM) / (1 - DEEPEN_FROM)));
+    const deepen = d * d * (3 - 2 * d);
+
     if (Math.abs(heroProgress - lastHeroProgress) > 0.002) {
       backdrop.style.setProperty("--scroll-progress", heroProgress.toFixed(4));
       lastHeroProgress = heroProgress;
@@ -194,9 +213,10 @@ export const createInkScene = (canvas, { reducedMotion = false, fadeTarget = nul
 
     // Only touch the materials when it actually moves — this runs on every
     // scroll event.
-    if (Math.abs(thicken - lastThicken) > 0.004) {
-      clouds.setThicken(thicken);
+    if (Math.abs(thicken - lastThicken) > 0.004 || Math.abs(deepen - lastDeepen) > 0.004) {
+      clouds.setThicken(thicken, deepen);
       lastThicken = thicken;
+      lastDeepen = deepen;
       // The loop is halved below the fold and stopped entirely when the tab is
       // hidden, so a scroll that lands while paused must repaint itself.
       if (!running) draw();
